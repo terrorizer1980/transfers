@@ -1,11 +1,8 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import {
   Balance,
-  HashlockTransferResolverEncoding,
-  HashlockTransferStateEncoding,
   HashlockTransferState,
   HashlockTransferResolver,
-  JsonRpcProvider,
 } from "@connext/vector-types";
 import {
   getRandomAddress,
@@ -26,6 +23,8 @@ describe("HashlockTransfer", () => {
   const provider = ethers.provider;
 
   let transfer: HashlockTransfer;
+  let HashlockTransferStateEncoding: string;
+  let HashlockTransferResolverEncoding: string;
 
   beforeEach(async () => {
     const signers = await ethers.getSigners();
@@ -35,6 +34,9 @@ describe("HashlockTransfer", () => {
     );
     const deployed = await factory.deploy();
     transfer = (await deployed.deployed()) as HashlockTransfer;
+    const registry = await transfer.getRegistryInformation();
+    HashlockTransferStateEncoding = registry.stateEncoding;
+    HashlockTransferResolverEncoding = registry.resolverEncoding;
   });
 
   const createlockHash = (preImage: string): string =>

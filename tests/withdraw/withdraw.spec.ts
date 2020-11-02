@@ -2,8 +2,6 @@ import {
   WithdrawState,
   WithdrawResolver,
   Balance,
-  WithdrawStateEncoding,
-  WithdrawResolverEncoding,
 } from "@connext/vector-types";
 import {
   getRandomAddress,
@@ -29,6 +27,9 @@ describe("Withdraw", () => {
   let alice: ChannelSigner;
   let bob: ChannelSigner;
 
+  let WithdrawStateEncoding: string;
+  let WithdrawResolverEncoding: string;
+
   beforeEach(async () => {
     alice = new ChannelSigner(Wallet.createRandom().privateKey);
     bob = new ChannelSigner(Wallet.createRandom().privateKey);
@@ -36,6 +37,11 @@ describe("Withdraw", () => {
     const factory = await ethers.getContractFactory("Withdraw", alice);
     const deployed = await factory.deploy();
     withdraw = (await deployed.deployed()) as Withdraw;
+
+    // Get encodings
+    const registry = await withdraw.getRegistryInformation();
+    WithdrawStateEncoding = registry.stateEncoding;
+    WithdrawResolverEncoding = registry.resolverEncoding;
   });
 
   const createInitialState = async (
