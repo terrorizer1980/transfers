@@ -12,13 +12,17 @@ const config: HardhatUserConfig = {
     artifacts: "./artifacts",
   },
   solidity: {
-    version: packageJson.devDependencies.solc,
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
-      },
-    },
+    compilers: [
+      {
+        version: packageJson.devDependencies.solc,
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        }
+      }
+    ]
   },
   defaultNetwork: "hardhat",
   networks: {
