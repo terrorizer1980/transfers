@@ -103,7 +103,7 @@ describe("Insurance", () => {
         throw new Error('Method not yet implemented')
     }
 
-    /** basic tests */
+    /** basic tests **/
 
     it("should deploy", async () => {
         expect(insurance.address).to.be.a("string");
@@ -124,12 +124,12 @@ describe("Insurance", () => {
         expect(registry.definition).to.be.eq(insurance.address)
     })
 
-    /** create tests */
+    /** create tests **/
     describe("Create", () => {
         throw new Error('Method not yet implemented')
     });
 
-    /** resolve tests */
+    /** resolve tests **/
     describe("Resolve", () => {
         throw new Error('Method not yet implemented')
     });
