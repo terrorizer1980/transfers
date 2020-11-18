@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
 import {
   WithdrawState,
   WithdrawResolver,
@@ -64,6 +65,8 @@ describe("Withdraw", () => {
         data,
         nonce: getRandomBytes32(),
         fee: "0",
+        callData: "0x",
+        callTo: AddressZero,
         ...(overrides.state ?? {}),
       },
     };
@@ -135,7 +138,7 @@ describe("Withdraw", () => {
     const registry = await withdraw.getRegistryInformation();
     expect(registry.name).to.be.eq("Withdraw");
     expect(registry.stateEncoding).to.be.eq(
-      "tuple(bytes initiatorSignature, address initiator, address responder, bytes32 data, uint256 nonce, uint256 fee)"
+      "tuple(bytes initiatorSignature, address initiator, address responder, bytes32 data, uint256 nonce, uint256 fee, address callTo, bytes callData)"
     );
     expect(registry.resolverEncoding).to.be.eq(
       "tuple(bytes responderSignature)"
