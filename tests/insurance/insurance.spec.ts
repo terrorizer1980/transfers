@@ -172,7 +172,7 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: mediator.address,
                 collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
                 UUID: getRandomBytes32()
             }
 
@@ -190,7 +190,7 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: mediator.address,
                 collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
                 UUID: getRandomBytes32()
             }
 
@@ -211,7 +211,7 @@ describe("Insurance", () => {
                 receiver: '0x0000000000000000000000000000000000000000',
                 mediator: mediator.address,
                 collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
                 UUID: getRandomBytes32()
             }
 
@@ -219,7 +219,7 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: '0x0000000000000000000000000000000000000000',
                 collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
                 UUID: getRandomBytes32()
             }
 
@@ -265,7 +265,7 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: mediator.address,
                 collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                expiration:  `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
                 UUID: mkBytes32('0x')
             }
 
@@ -286,7 +286,7 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: mediator.address,
                 collateral: '0',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                expiration:  `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
                 UUID: getRandomBytes32()
             }
 
@@ -312,7 +312,7 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: mediator.address,
                 collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                expiration:  `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
                 UUID: UUID
             }
 
@@ -347,7 +347,7 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: mediator.address,
                 collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                expiration:  `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
                 UUID: UUID
             }
 
@@ -381,7 +381,7 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: mediator.address,
                 collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                expiration:  `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
                 UUID: UUID
             }
 
@@ -402,9 +402,9 @@ describe("Insurance", () => {
             await resolveTransfer(balance, state, resolver)
         })
 
-        /*
-
-        it("should fail if the signature is invalid", async () => {
+        it("should fail if the recipient signature is invalid", async () => {
+            let UUID = getRandomBytes32()
+            
             // Alice puts up 10k, bob puts up zero
             let initialBalance: Balance = {
                 amount: ['10000', '0'],
@@ -415,16 +415,62 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: mediator.address,
                 collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
-                UUID: getRandomBytes32()
+                expiration:  `${Math.floor(Date.now()/1000) + (2 * 24 * 60 * 60)}`,
+                UUID: UUID
             }
 
             const { balance, state } = await createInitialState(initialState, initialBalance)
 
-            throw new Error('Method not yet implemented!')
+            let resolverData: InsuranceResolverData = { amount: '5000', UUID: UUID }
+
+            const recipientSignature = await bob.signMessage(getRandomBytes32())
+
+            let resolver: InsuranceResolver = {
+                data: resolverData,
+                signature: recipientSignature
+            }
+            
+            await expect(resolveTransfer(balance, state, resolver)).revertedWith(
+                "Signature did not verify!"
+            )
+        })
+
+        it("should fail if the mediator signature is invalid", async () => {
+            let UUID = getRandomBytes32()
+            
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration:  `${Math.floor(Date.now()/1000) + (2 * 24 * 60 * 60)}`,
+                UUID: UUID
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+
+            let resolverData: InsuranceResolverData = { amount: '5000', UUID: UUID }
+
+            const mediatorSignature = await mediator.signMessage(getRandomBytes32())
+
+            let resolver: InsuranceResolver = {
+                data: resolverData,
+                signature: mediatorSignature
+            }
+            
+            await expect(resolveTransfer(balance, state, resolver)).revertedWith(
+                "Signature did not verify!"
+            )
         })
 
         it("should fail if the amount is greater than the transfer", async () => {
+            let UUID = getRandomBytes32()
+            
             // Alice puts up 10k, bob puts up zero
             let initialBalance: Balance = {
                 amount: ['10000', '0'],
@@ -435,33 +481,27 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: mediator.address,
                 collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
-                UUID: getRandomBytes32()
+                expiration:  `${Math.floor(Date.now()/1000) + (2 * 24 * 60 * 60)}`,
+                UUID: UUID
             }
 
             const { balance, state } = await createInitialState(initialState, initialBalance)
 
-            throw new Error('Method not yet implemented!')
-        })
+            let resolverDataEncoding = ["tuple(uint256 amount, bytes32 UUID)"]
+            let resolverData: InsuranceResolverData = { amount: '15000', UUID: UUID }
+            let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolverData])
+            let hashedData = keccak256(encodedData)
 
-        it("should fail if the payment is expired", async () => {
-            // Alice puts up 10k, bob puts up zero
-            let initialBalance: Balance = {
-                amount: ['10000', '0'],
-                to: [alice.address, bob.address]
+            const mediatorSignature = await mediator.signMessage(hashedData)
+
+            let resolver: InsuranceResolver = {
+                data: resolverData,
+                signature: mediatorSignature
             }
-
-            let initialState: InsuranceState = {
-                receiver: bob.address,
-                mediator: mediator.address,
-                collateral: '10000',
-                expiration: `${Date.now() + (3 * 24 * 60)}`,
-                UUID: getRandomBytes32()
-            }
-
-            const { balance, state } = await createInitialState(initialState, initialBalance)
-            throw new Error('Method not yet implemented!')
-        })
-        */
+            
+            await expect(resolveTransfer(balance, state, resolver)).revertedWith(
+                "Cannot transfer more than originally allocated."
+            )
+        }) 
     });
 })
