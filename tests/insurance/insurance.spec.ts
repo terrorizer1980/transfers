@@ -1,7 +1,9 @@
-import { Balance, Address, Bytes32, SignatureString } from "@connext/vector-types";
-import { expect, ChannelSigner } from "@connext/vector-utils"
+import { Balance, Address, Bytes32, SignatureString} from "@connext/vector-types";
+import { expect, ChannelSigner, encodeTransferState, encodeBalance, keyify, encodeTransferResolver, recoverAddressFromChannelMessage, getRandomBytes32, mkBytes32 } from "@connext/vector-utils"
 import { Wallet } from "ethers"
+import { AbiCoder, defaultAbiCoder, keccak256 } from "ethers/lib/utils";
 import { ethers } from "hardhat"
+import { receiveMessageOnPort } from "worker_threads";
 import { Insurance } from "../../typechain"
 
 // Here we define the state & resolver encodings as types
@@ -30,6 +32,7 @@ describe("Insurance", () => {
 
     let alice: ChannelSigner
     let bob: ChannelSigner
+    let mediator: ChannelSigner
 
     let InsuranceStateEncoding: string
     let InsuranceResolverEncoding: string
@@ -38,6 +41,7 @@ describe("Insurance", () => {
         // Create channel signers
         alice = new ChannelSigner(Wallet.createRandom().privateKey)
         bob = new ChannelSigner(Wallet.createRandom().privateKey)
+        mediator = new ChannelSigner(Wallet.createRandom().privateKey)
 
         // Deploy the insurance contract
         const factory = await ethers.getContractFactory("Insurance", alice)
@@ -52,13 +56,13 @@ describe("Insurance", () => {
 
     // Encode/create the insurance state encoding (for create())
     const createInitialState = async (
-        data: string,
-        overrides: {
-            state?: Partial<InsuranceState>
-            balance?: Partial<Balance>
-        } = { balance: {}, state: {} }
+        initialState: InsuranceState,
+        initialBalances: Balance
     ): Promise<{ state: InsuranceState; balance: Balance }> => {
-        throw new Error('Method not yet implemented')
+        return {
+            state: initialState,
+            balance: initialBalances
+        }
     }
 
     /**
@@ -69,10 +73,13 @@ describe("Insurance", () => {
      * create(balance, state) on the smart contract itself
      */
     const createTransfer = async (
-        balance: Balance,
+        balance: Balance, 
         initialState: InsuranceState
     ): Promise<boolean> => {
-        throw new Error('Method not yet implemented')
+        const encodedState = encodeTransferState(initialState, InsuranceStateEncoding)
+        const encodedBalance = encodeBalance(balance)
+        
+        return insurance.create(encodedBalance, encodedState)
     }
 
     /**
@@ -87,7 +94,19 @@ describe("Insurance", () => {
         initialState: InsuranceState,
         resolver: InsuranceResolver
     ): Promise<Balance> => {
-        throw new Error('Method not yet implemented')
+        const encodedState = encodeTransferState(initialState, InsuranceStateEncoding)
+        const encodedResolver = encodeTransferResolver(resolver, InsuranceResolverEncoding)
+        const encodedBalance = encodeBalance(balance)
+
+        const ret = (
+            await insurance.functions.resolve(
+                encodedBalance,
+                encodedState,
+                encodedResolver
+            )
+        )[0]
+
+        return keyify(balance, ret)
     }
 
     /**
@@ -100,7 +119,23 @@ describe("Insurance", () => {
         resolver: InsuranceResolver,
         result: Balance
     ): Promise<void> => {
-        throw new Error('Method not yet implemented')
+        let resolverDataEncoding = ["tuple(uint256 amount, bytes32 UUID)"]
+        let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolver.data])
+        let signer = await recoverAddressFromChannelMessage(keccak256(encodedData), resolver.signature)
+
+        // Receiver signs, payment aborted
+        if (signer == initialState.receiver) {
+            expect(result.amount[0].toString()).to.eq(initialBalance.amount[0]);
+            expect(result.amount[1].toString()).to.eq(initialBalance.amount[1]);
+            expect(result.to).to.deep.equal(initialBalance.to);
+        // Mediator signs, payment made
+        } else {
+            let finalBalance0 = BigInt(initialBalance.amount[0]) - BigInt(resolver.data.amount)
+            let finalBalance1 = BigInt(resolver.data.amount)
+
+            expect(result.amount[0].toString()).to.eq(finalBalance0)
+            expect(result.amount[1].toString()).to.eq(finalBalance1)
+        }
     }
 
     /** basic tests **/
@@ -126,11 +161,307 @@ describe("Insurance", () => {
 
     /** create tests **/
     describe("Create", () => {
-        throw new Error('Method not yet implemented')
+        it("should create successfully", async () => {
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: getRandomBytes32()
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+        })
+        
+        it("should fail if recipient has nonzero balance", async () => {
+            // Alice puts up 10k, bob puts up 10k
+            let initialBalance: Balance = {
+                amount: ['10000', '10000'],
+                to: [alice.address, bob.address]
+            } 
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: getRandomBytes32()
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            await expect(createTransfer(balance, state)).revertedWith(
+                "Cannot create parameterized payment with nonzero recipient init balance"
+            )
+        })
+
+        it("should fail if recipient or mediator have zero address", async () => {
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            } 
+
+            let initialState1: InsuranceState = {
+                receiver: '0x0000000000000000000000000000000000000000',
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: getRandomBytes32()
+            }
+
+            let initialState2: InsuranceState = {
+                receiver: bob.address,
+                mediator: '0x0000000000000000000000000000000000000000',
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: getRandomBytes32()
+            }
+
+            const state1 = await createInitialState(initialState1, initialBalance)
+            const state2 = await createInitialState(initialState2, initialBalance)
+            await expect(createTransfer(state1.balance, state1.state)).revertedWith(
+                "Receiver address cannot be the zero address!"
+            )
+            await expect(createTransfer(state2.balance, state2.state)).revertedWith(
+                "Mediator address cannot be the zero address!"
+            )
+        })
+
+        it("should fail if expiration is less than 3 days in the future", async () => {
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            } 
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Math.floor(Date.now()/1000) + (2 * 24 * 60)}`,
+                UUID: getRandomBytes32()
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            await expect(createTransfer(balance, state)).revertedWith(
+                "Expiration must be at least 3 days in the future."
+            )
+        })
+
+        it("should fail if UUID is null", async () => {
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            } 
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: mkBytes32('0x')
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            await expect(createTransfer(balance, state)).revertedWith(
+                "UUID cannot be null."
+            )
+        })
+
+        it("should fail is collateral is zero", async () => {
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            } 
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '0',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: getRandomBytes32()
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            await expect(createTransfer(balance, state)).revertedWith(
+                "Collateral must be nonzero"
+            )
+        })
     });
 
     /** resolve tests **/
     describe("Resolve", () => {
-        throw new Error('Method not yet implemented')
+        it("should resolve successfully when cancelled by the recipient", async () => {
+            let UUID = getRandomBytes32()
+            
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: UUID
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+
+            let resolverDataEncoding = ["tuple(uint256 amount, bytes32 UUID)"]
+            let resolverData: InsuranceResolverData = { amount: '0', UUID: UUID }
+            let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolverData])
+            let hashedData = keccak256(encodedData)
+
+            const recipientSignature = await bob.signMessage(hashedData)
+
+            let resolver: InsuranceResolver = {
+                data: resolverData,
+                signature: recipientSignature
+            }
+            
+            await resolveTransfer(balance, state, resolver)
+        })
+
+        
+        it("should resolve successfully when signed by the mediator for the full collateral amount", async () => {
+            let UUID = getRandomBytes32()
+            
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: UUID
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+
+            let resolverDataEncoding = ["tuple(uint256 amount, bytes32 UUID)"]
+            let resolverData: InsuranceResolverData = { amount: '10000', UUID: UUID }
+            let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolverData])
+            let hashedData = keccak256(encodedData)
+
+            const mediatorSignature = await mediator.signMessage(hashedData)
+
+            let resolver: InsuranceResolver = {
+                data: resolverData,
+                signature: mediatorSignature
+            }
+            
+            await resolveTransfer(balance, state, resolver)
+        })
+
+        it("should resolve successfully when signed by the mediator for a partial collateral amount", async () => {
+            let UUID = getRandomBytes32()
+            
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: UUID
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+
+            let resolverDataEncoding = ["tuple(uint256 amount, bytes32 UUID)"]
+            let resolverData: InsuranceResolverData = { amount: '5000', UUID: UUID }
+            let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolverData])
+            let hashedData = keccak256(encodedData)
+
+            const mediatorSignature = await mediator.signMessage(hashedData)
+
+            let resolver: InsuranceResolver = {
+                data: resolverData,
+                signature: mediatorSignature
+            }
+            
+            await resolveTransfer(balance, state, resolver)
+        })
+
+        /*
+
+        it("should fail if the signature is invalid", async () => {
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: getRandomBytes32()
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+
+            throw new Error('Method not yet implemented!')
+        })
+
+        it("should fail if the amount is greater than the transfer", async () => {
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: getRandomBytes32()
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+
+            throw new Error('Method not yet implemented!')
+        })
+
+        it("should fail if the payment is expired", async () => {
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            let initialState: InsuranceState = {
+                receiver: bob.address,
+                mediator: mediator.address,
+                collateral: '10000',
+                expiration: `${Date.now() + (3 * 24 * 60)}`,
+                UUID: getRandomBytes32()
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            throw new Error('Method not yet implemented!')
+        })
+        */
     });
 })
