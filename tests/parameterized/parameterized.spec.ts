@@ -1,6 +1,7 @@
-import { Balance, Address, Bytes32, SignatureString } from "@connext/vector-types";
-import { expect, ChannelSigner } from "@connext/vector-utils"
+import { Balance, Address, Bytes32, SignatureString} from "@connext/vector-types";
+import { expect, ChannelSigner, encodeTransferState, encodeBalance, keyify, encodeTransferResolver, recoverAddressFromChannelMessage, getRandomBytes32, mkBytes32 } from "@connext/vector-utils"
 import { Wallet } from "ethers"
+import { defaultAbiCoder, keccak256, recoverAddress } from "ethers/lib/utils";
 import { ethers } from "hardhat"
 import { Parameterized } from "../../typechain"
 
@@ -31,7 +32,7 @@ type ParameterizedResolver = {
 }
 
 describe("Parameterized", () => {
-    let Parameterized: Parameterized
+    let parameterized: Parameterized
 
     let alice: ChannelSigner
     let bob: ChannelSigner
@@ -47,23 +48,24 @@ describe("Parameterized", () => {
         // Deploy the Parameterized contract
         const factory = await ethers.getContractFactory("Parameterized", alice)
         const deployed = await factory.deploy()
-        Parameterized = (await deployed.deployed()) as Parameterized
+        parameterized = (await deployed.deployed()) as Parameterized
 
         // Get encodings
-        const registry = await Parameterized.getRegistryInformation()
+        const registry = await parameterized.getRegistryInformation()
         ParameterizedStateEncoding = registry.stateEncoding
         ParameterizedResolverEncoding = registry.resolverEncoding
     })
 
-    // Encode/create the parameterized state encoding (for create())
+    
+    // Encode/create the insurance state encoding (for create())
     const createInitialState = async (
-        data: string,
-        overrides: {
-            state?: Partial<ParameterizedState>
-            balance?: Partial<Balance>
-        } = { balance: {}, state: {} }
+        initialState: ParameterizedState,
+        initialBalances: Balance
     ): Promise<{ state: ParameterizedState; balance: Balance }> => {
-        throw new Error('Method not yet implemented')
+        return {
+            state: initialState,
+            balance: initialBalances
+        }
     }
 
     /**
@@ -74,10 +76,13 @@ describe("Parameterized", () => {
      * create(balance, state) on the smart contract itself
      */
     const createTransfer = async (
-        balance: Balance,
+        balance: Balance, 
         initialState: ParameterizedState
     ): Promise<boolean> => {
-        throw new Error('Method not yet implemented')
+        const encodedState = encodeTransferState(initialState, ParameterizedStateEncoding)
+        const encodedBalance = encodeBalance(balance)
+        
+        return parameterized.create(encodedBalance, encodedState)
     }
 
     /**
@@ -92,30 +97,58 @@ describe("Parameterized", () => {
         initialState: ParameterizedState,
         resolver: ParameterizedResolver
     ): Promise<Balance> => {
-        throw new Error('Method not yet implemented')
+        const encodedState = encodeTransferState(initialState, ParameterizedStateEncoding)
+        const encodedResolver = encodeTransferResolver(resolver, ParameterizedResolverEncoding)
+        const encodedBalance = encodeBalance(balance)
+
+        const ret = (
+            await parameterized.functions.resolve(
+                encodedBalance,
+                encodedState,
+                encodedResolver
+            )
+        )[0]
+
+        return keyify(balance, ret)
     }
+    
 
     /**
      * Given the balance, state, resolver, and resulting balances after a transfer
      * is created and then resolved, verifies expected balances against actual
      */
+
     const validateResult = async (
         initialBalance: Balance,
         initialState: ParameterizedState,
         resolver: ParameterizedResolver,
         result: Balance
     ): Promise<void> => {
-        throw new Error('Method not yet implemented')
-    }
+        let resolverDataEncoding = ["tuple(bytes32 UUID, uint256 paymentAmountTaken)"]
+        let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolver.data])
+        let hashedData = keccak256(encodedData)
+        let signer = await recoverAddressFromChannelMessage(hashedData, resolver.payeeSignature)
 
+        // Receiver signs, payment completed as normal
+        expect(signer == initialState.receiver) {
+            let amountTransferred = resolver.data.paymentAmountTaken
+
+            let finalBalance0 = BigInt(initialBalance.amount[0]) - BigInt(amountTransferred)
+            let finalBalance1 = BigInt(amountTransferred)
+
+            expect(result.amount[0].toString()).to.eq(finalBalance0.toString())
+            expect(result.amount[1].toString()).to.eq(finalBalance1.toString())
+        }
+    }
+    
     /** basic tests */
 
     it("should deploy", async () => {
-        expect(Parameterized.address).to.be.a("string");
+        expect(parameterized.address).to.be.a("string");
     })
 
     it("should return the registry information", async () => {
-        const registry = await Parameterized.getRegistryInformation()
+        const registry = await parameterized.getRegistryInformation()
 
         expect(registry.name).to.be.eq(
             "Parameterized"
@@ -126,16 +159,55 @@ describe("Parameterized", () => {
         expect(registry.resolverEncoding).to.be.eq(
             "tuple(tuple(uint256 amount, bytes32 UUID) data, bytes signature)"
         )
-        expect(registry.definition).to.be.eq(Parameterized.address)
+        expect(registry.definition).to.be.eq(parameterized.address)
     })
 
     /** create tests */
+
     describe("Create", () => {
-        throw new Error('Method not yet implemented')
+        it("should create successfully", async () => {
+            throw new Error('Method not yet implemented.')
+        })
+
+        it("should fail if recipient has nonzero balance", async () => {
+            throw new Error('Method not yet implemented.')
+        })
+
+        it("should fail if recipient is the zero address", async () => {
+            throw new Error('Method not yet implemented.')
+        })
+
+        it("should fail if the expiration is less than 3 days in the future", async () => {
+            throw new Error('Method not yet implemented.')
+        })
+
+        it("should fail if the UUID is null", async () => {
+            throw new Error('Method not yet implemented.')
+        })
+
+        it("should fail is the rate is invalid", async () => {
+            throw new Error('Method not yet implemented.')
+        })
     });
 
     /** resolve tests */
+
     describe("Resolve", () => {
-        throw new Error('Method not yet implemented')
+        it("should resolve successfully", async () => {
+            throw new Error('Method not yet implemented.')
+        })
+
+        it("should fail if the recipient signature is invalid", async () => {
+            throw new Error('Method not yet implemented.')
+        })
+
+        it("should fail if the amount is greater than the transfer", async () => {
+            throw new Error('Method not yet implemented.')
+        })
+
+        it("should fail if the amount taken exceeds the allowed rate", async () => {
+            throw new Error('Method not yet implemented.')
+        })
     });
+
 })
