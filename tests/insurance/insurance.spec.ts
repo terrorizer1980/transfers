@@ -121,7 +121,8 @@ describe("Insurance", () => {
     ): Promise<void> => {
         let resolverDataEncoding = ["tuple(uint256 amount, bytes32 UUID)"]
         let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolver.data])
-        let signer = await recoverAddressFromChannelMessage(keccak256(encodedData), resolver.signature)
+        let hashedData = keccak256(encodedData)
+        let signer = await recoverAddressFromChannelMessage(hashedData, resolver.signature)
 
         // Receiver signs, payment aborted
         if (signer == initialState.receiver) {
@@ -133,8 +134,8 @@ describe("Insurance", () => {
             let finalBalance0 = BigInt(initialBalance.amount[0]) - BigInt(resolver.data.amount)
             let finalBalance1 = BigInt(resolver.data.amount)
 
-            expect(result.amount[0].toString()).to.eq(finalBalance0)
-            expect(result.amount[1].toString()).to.eq(finalBalance1)
+            expect(result.amount[0].toString()).to.eq(finalBalance0.toString())
+            expect(result.amount[1].toString()).to.eq(finalBalance1.toString())
         }
     }
 
@@ -330,9 +331,9 @@ describe("Insurance", () => {
                 signature: recipientSignature
             }
             
-            await resolveTransfer(balance, state, resolver)
+            const result = await resolveTransfer(balance, state, resolver)
+            await validateResult(initialBalance, initialState, resolver, result)
         })
-
         
         it("should resolve successfully when signed by the mediator for the full collateral amount", async () => {
             let UUID = getRandomBytes32()
@@ -347,7 +348,7 @@ describe("Insurance", () => {
                 receiver: bob.address,
                 mediator: mediator.address,
                 collateral: '10000',
-                expiration:  `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
                 UUID: UUID
             }
 
@@ -365,7 +366,8 @@ describe("Insurance", () => {
                 signature: mediatorSignature
             }
             
-            await resolveTransfer(balance, state, resolver)
+            const result = await resolveTransfer(balance, state, resolver)
+            await validateResult(initialBalance, initialState, resolver, result)
         })
 
         it("should resolve successfully when signed by the mediator for a partial collateral amount", async () => {
@@ -399,7 +401,8 @@ describe("Insurance", () => {
                 signature: mediatorSignature
             }
             
-            await resolveTransfer(balance, state, resolver)
+            const result = await resolveTransfer(balance, state, resolver)
+            await validateResult(initialBalance, initialState, resolver, result)
         })
 
         it("should fail if the recipient signature is invalid", async () => {
