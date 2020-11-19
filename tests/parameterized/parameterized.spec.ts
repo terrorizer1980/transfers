@@ -130,15 +130,15 @@ describe("Parameterized", () => {
         let signer = await recoverAddressFromChannelMessage(hashedData, resolver.payeeSignature)
 
         // Receiver signs, payment completed as normal
-        expect(signer == initialState.receiver) {
-            let amountTransferred = resolver.data.paymentAmountTaken
+        expect(signer == initialState.receiver)
 
-            let finalBalance0 = BigInt(initialBalance.amount[0]) - BigInt(amountTransferred)
-            let finalBalance1 = BigInt(amountTransferred)
+        let amountTransferred = resolver.data.paymentAmountTaken
 
-            expect(result.amount[0].toString()).to.eq(finalBalance0.toString())
-            expect(result.amount[1].toString()).to.eq(finalBalance1.toString())
-        }
+        let finalBalance0 = BigInt(initialBalance.amount[0]) - BigInt(amountTransferred)
+        let finalBalance1 = BigInt(amountTransferred)
+
+        expect(result.amount[0].toString()).to.eq(finalBalance0.toString())
+        expect(result.amount[1].toString()).to.eq(finalBalance1.toString())
     }
     
     /** basic tests */
@@ -154,10 +154,10 @@ describe("Parameterized", () => {
             "Parameterized"
         )
         expect(registry.stateEncoding).to.be.eq(
-            "tuple(address receiver, address mediator, uint256 collateral, uint256 expiration, bytes32 UUID)"
+            "tuple(address receiver, uint256 start, uint256 expiration, bytes32 UUID, tuple(uint256 deltaAmount, uint256 deltaTime) rate)"
         )
         expect(registry.resolverEncoding).to.be.eq(
-            "tuple(tuple(uint256 amount, bytes32 UUID) data, bytes signature)"
+            "tuple(tuple(bytes32 UUID, uint256 paymentAmountTaken) data, bytes payeeSignature)"
         )
         expect(registry.definition).to.be.eq(parameterized.address)
     })
@@ -166,48 +166,372 @@ describe("Parameterized", () => {
 
     describe("Create", () => {
         it("should create successfully", async () => {
-            throw new Error('Method not yet implemented.')
+            let UUID = getRandomBytes32()
+
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            // Essentially an infinite rate since it's larger than the balance @ 1 second
+            let rate: Rate = {
+                deltaAmount: '100000',
+                deltaTime: '1'
+            }
+
+            // Start: now
+            // Expiration: 5 days in the future
+            let initialState: ParameterizedState = {
+                receiver: bob.address,
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                UUID: UUID,
+                rate: rate
+            }
+
+            await createInitialState(initialState, initialBalance)
         })
 
         it("should fail if recipient has nonzero balance", async () => {
-            throw new Error('Method not yet implemented.')
+            let UUID = getRandomBytes32()
+
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '10000'],
+                to: [alice.address, bob.address]
+            }
+
+            // Essentially an infinite rate since it's larger than the balance @ 1 second
+            let rate: Rate = {
+                deltaAmount: '100000',
+                deltaTime: '1'
+            }
+
+            // Start: now
+            // Expiration: 5 days in the future
+            let initialState: ParameterizedState = {
+                receiver: bob.address,
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                UUID: UUID,
+                rate: rate
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            await expect(createTransfer(balance, state)).revertedWith(
+                "Cannot create parameterized payment with nonzero recipient init balance"
+            )
         })
 
         it("should fail if recipient is the zero address", async () => {
-            throw new Error('Method not yet implemented.')
+            let UUID = getRandomBytes32()
+
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            // Essentially an infinite rate since it's larger than the balance @ 1 second
+            let rate: Rate = {
+                deltaAmount: '100000',
+                deltaTime: '1'
+            }
+
+            // Start: now
+            // Expiration: 5 days in the future
+            let initialState: ParameterizedState = {
+                receiver: '0x0000000000000000000000000000000000000000',
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                UUID: UUID,
+                rate: rate
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            await expect(createTransfer(balance, state)).revertedWith(
+                "Receiver address cannot be the zero address!"
+            )
         })
 
         it("should fail if the expiration is less than 3 days in the future", async () => {
-            throw new Error('Method not yet implemented.')
+            let UUID = getRandomBytes32()
+
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            // Essentially an infinite rate since it's larger than the balance @ 1 second
+            let rate: Rate = {
+                deltaAmount: '100000',
+                deltaTime: '1'
+            }
+
+            // Start: now
+            // Expiration: 5 days in the future
+            let initialState: ParameterizedState = {
+                receiver: bob.address,
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (2 * 24 * 60 * 60)}`,
+                UUID: UUID,
+                rate: rate
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            await expect(createTransfer(balance, state)).revertedWith(
+                "Expiration must be at least 3 days in the future."
+            )
         })
 
         it("should fail if the UUID is null", async () => {
-            throw new Error('Method not yet implemented.')
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            // Essentially an infinite rate since it's larger than the balance @ 1 second
+            let rate: Rate = {
+                deltaAmount: '100000',
+                deltaTime: '1'
+            }
+
+            // Start: now
+            // Expiration: 5 days in the future
+            let initialState: ParameterizedState = {
+                receiver: bob.address,
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                UUID: mkBytes32('0x'),
+                rate: rate
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            await expect(createTransfer(balance, state)).revertedWith(
+                "UUID cannot be null."
+            )
         })
 
         it("should fail is the rate is invalid", async () => {
-            throw new Error('Method not yet implemented.')
+            let UUID = getRandomBytes32()
+
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            let rate1: Rate = { deltaAmount: '0', deltaTime: '1'}
+            let rate2: Rate = { deltaAmount: '1', deltaTime: '0'}
+
+            // Start: now
+            // Expiration: 5 days in the future
+            let initialState1: ParameterizedState = {
+                receiver: bob.address,
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                UUID: UUID,
+                rate: rate1
+            }
+
+            let initialState2: ParameterizedState = {
+                receiver: bob.address,
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                UUID: UUID,
+                rate: rate2
+            }
+
+            const state1 = await createInitialState(initialState1, initialBalance)
+            const state2 = await createInitialState(initialState2, initialBalance)
+
+            await expect(createTransfer(state1.balance, state1.state)).revertedWith(
+                "Per-unit amount must be at least 1 wei"
+            )
+
+            await expect(createTransfer(state2.balance, state2.state)).revertedWith(
+                "Per-unit time must be at least 1 second"
+            )
         })
     });
 
     /** resolve tests */
 
     describe("Resolve", () => {
-        it("should resolve successfully", async () => {
-            throw new Error('Method not yet implemented.')
+        it("should resolve successfully when taking full payment", async () => {
+            let UUID = getRandomBytes32()
+
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            // Essentially an infinite rate since it's larger than the balance @ 1 second
+            let rate: Rate = {
+                deltaAmount: '100000',
+                deltaTime: '1'
+            }
+
+            // Start: now
+            // Expiration: 5 days in the future
+            let initialState: ParameterizedState = {
+                receiver: bob.address,
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                UUID: UUID,
+                rate: rate
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            
+            let resolverDataEncoding = ["tuple(bytes32 UUID, uint256 paymentAmountTaken)"]
+            let resolverData: ParameterizedResolverData = { UUID: UUID, paymentAmountTaken: '10000'}
+            let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolverData])
+            let hashedData = keccak256(encodedData)
+
+            const recipientSignature = await bob.signMessage(hashedData)
+
+            let resolver: ParameterizedResolver = {
+                data: resolverData,
+                payeeSignature: recipientSignature
+            }
+
+            const result = await resolveTransfer(balance, state, resolver)
+            await validateResult(initialBalance, initialState, resolver, result)
         })
 
-        it("should fail if the recipient signature is invalid", async () => {
-            throw new Error('Method not yet implemented.')
+        it("should resolve successfully when taking partial payment", async () => {
+            let UUID = getRandomBytes32()
+
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            // Essentially an infinite rate since it's larger than the balance @ 1 second
+            let rate: Rate = {
+                deltaAmount: '100000',
+                deltaTime: '1'
+            }
+
+            // Start: now
+            // Expiration: 5 days in the future
+            let initialState: ParameterizedState = {
+                receiver: bob.address,
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                UUID: UUID,
+                rate: rate
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            
+            let resolverDataEncoding = ["tuple(bytes32 UUID, uint256 paymentAmountTaken)"]
+            let resolverData: ParameterizedResolverData = { UUID: UUID, paymentAmountTaken: '5000'}
+            let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolverData])
+            let hashedData = keccak256(encodedData)
+
+            const recipientSignature = await bob.signMessage(hashedData)
+
+            let resolver: ParameterizedResolver = {
+                data: resolverData,
+                payeeSignature: recipientSignature
+            }
+
+            const result = await resolveTransfer(balance, state, resolver)
+            await validateResult(initialBalance, initialState, resolver, result)
         })
 
-        it("should fail if the amount is greater than the transfer", async () => {
-            throw new Error('Method not yet implemented.')
-        })
+        it("should fail if trying to take too much payment", async () => {
+            let UUID = getRandomBytes32()
 
-        it("should fail if the amount taken exceeds the allowed rate", async () => {
-            throw new Error('Method not yet implemented.')
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            // Essentially an infinite rate since it's larger than the balance @ 1 second
+            let rate: Rate = {
+                deltaAmount: '100000',
+                deltaTime: '1'
+            }
+
+            // Start: now
+            // Expiration: 5 days in the future
+            let initialState: ParameterizedState = {
+                receiver: bob.address,
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                UUID: UUID,
+                rate: rate
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            
+            let resolverDataEncoding = ["tuple(bytes32 UUID, uint256 paymentAmountTaken)"]
+            let resolverData: ParameterizedResolverData = { UUID: UUID, paymentAmountTaken: '10001'}
+            let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolverData])
+            let hashedData = keccak256(encodedData)
+
+            const recipientSignature = await bob.signMessage(hashedData)
+
+            let resolver: ParameterizedResolver = {
+                data: resolverData,
+                payeeSignature: recipientSignature
+            }
+
+            await expect(resolveTransfer(balance, state, resolver)).revertedWith(
+                "Cannot take more payment than originally allocated."
+            )
+        })
+        it("should fail if trying to take payment too fast (exceeding the rate)", async () => {
+            let UUID = getRandomBytes32()
+
+            // Alice puts up 10k, bob puts up zero
+            let initialBalance: Balance = {
+                amount: ['10000', '0'],
+                to: [alice.address, bob.address]
+            }
+
+            // A small rate
+            let rate: Rate = {
+                deltaAmount: '1',
+                deltaTime: '100'
+            }
+
+            // Start: now
+            // Expiration: 5 days in the future
+            let initialState: ParameterizedState = {
+                receiver: bob.address,
+                start: `${Math.floor(Date.now()/1000)}`,
+                expiration: `${Math.floor(Date.now()/1000) + (5 * 24 * 60 * 60)}`,
+                UUID: UUID,
+                rate: rate
+            }
+
+            const { balance, state } = await createInitialState(initialState, initialBalance)
+            
+            let resolverDataEncoding = ["tuple(bytes32 UUID, uint256 paymentAmountTaken)"]
+            let resolverData: ParameterizedResolverData = { UUID: UUID, paymentAmountTaken: '10000'}
+            let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [resolverData])
+            let hashedData = keccak256(encodedData)
+
+            const recipientSignature = await bob.signMessage(hashedData)
+
+            let resolver: ParameterizedResolver = {
+                data: resolverData,
+                payeeSignature: recipientSignature
+            }
+
+            await expect(resolveTransfer(balance, state, resolver)).revertedWith(
+                "Payment rate exceeded."
+            )
         })
     });
-
 })

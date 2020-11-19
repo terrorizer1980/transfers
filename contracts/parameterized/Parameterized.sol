@@ -81,7 +81,7 @@ contract Parameterized is ITransferDefinition {
 
     // Parameterized payment checks
     require(rate.deltaAmount >= 1, "Per-unit amount must be at least 1 wei");
-    require(rate.deltaTime >= 15, "Per-unit time must be at least 15 seconds");
+    require(rate.deltaTime >= 1, "Per-unit time must be at least 1 second");
     require(state.expiration > block.timestamp + 3 days, "Expiration must be at least 3 days in the future.");
 
     // Sanity checks
@@ -120,8 +120,8 @@ contract Parameterized is ITransferDefinition {
 
     // Rate should not be exceeded; multiply by large number to avoid precision errors
     uint256 timeElapsed = block.timestamp.sub(state.start);
-    uint256 averageRate = data.paymentAmountTaken.div(timeElapsed.mul(2**64));
-    uint256 allowedRate = state.rate.deltaAmount.div(state.rate.deltaTime.mul(2**64));
+    uint256 averageRate = data.paymentAmountTaken.mul(2**64).div(timeElapsed);
+    uint256 allowedRate = state.rate.deltaAmount.mul(2**64).div(state.rate.deltaTime);
     require(averageRate <= allowedRate, "Payment rate exceeded.");
 
     // Transfer the payment amount

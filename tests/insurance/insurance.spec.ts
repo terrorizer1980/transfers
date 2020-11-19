@@ -1,9 +1,8 @@
 import { Balance, Address, Bytes32, SignatureString} from "@connext/vector-types";
 import { expect, ChannelSigner, encodeTransferState, encodeBalance, keyify, encodeTransferResolver, recoverAddressFromChannelMessage, getRandomBytes32, mkBytes32 } from "@connext/vector-utils"
 import { Wallet } from "ethers"
-import { AbiCoder, defaultAbiCoder, keccak256 } from "ethers/lib/utils";
+import { defaultAbiCoder, keccak256 } from "ethers/lib/utils";
 import { ethers } from "hardhat"
-import { receiveMessageOnPort } from "worker_threads";
 import { Insurance } from "../../typechain"
 
 // Here we define the state & resolver encodings as types
@@ -177,7 +176,7 @@ describe("Insurance", () => {
                 UUID: getRandomBytes32()
             }
 
-            const { balance, state } = await createInitialState(initialState, initialBalance)
+            await createInitialState(initialState, initialBalance)
         })
         
         it("should fail if recipient has nonzero balance", async () => {
