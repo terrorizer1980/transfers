@@ -143,7 +143,7 @@ describe("HashlockTransfer", () => {
       const { state, balance } = await createInitialState(preImage);
       balance.amount[1] = balance.amount[0];
       await expect(createTransfer(balance, state)).revertedWith(
-        "Cannot create hashlock transfer with nonzero recipient balance"
+        "HashlockTransfer: NONZERO_RECIPIENT_BALANCE"
       );
     });
 
@@ -152,7 +152,7 @@ describe("HashlockTransfer", () => {
       const { state, balance } = await createInitialState(preImage);
       state.lockHash = HashZero;
       await expect(createTransfer(balance, state)).revertedWith(
-        "Cannot create hashlock transfer with empty lockHash"
+        "HashlockTransfer: EMPTY_LOCKHASH"
       );
     });
 
@@ -161,7 +161,7 @@ describe("HashlockTransfer", () => {
       const { state, balance } = await createInitialState(preImage);
       state.expiry = "1";
       await expect(createTransfer(balance, state)).revertedWith(
-        "Cannot create hashlock transfer with expired timelock"
+        "HashlockTransfer: EXPIRED_TIMELOCK"
       );
     });
 
@@ -215,9 +215,7 @@ describe("HashlockTransfer", () => {
       const incorrectPreImage = getRandomBytes32();
       await expect(
         resolveTransfer(balance, state, { preImage: incorrectPreImage })
-      ).revertedWith(
-        "Hash generated from preimage does not match hash in state"
-      );
+      ).revertedWith("HashlockTransfer: INVALID_PREIMAGE");
     });
 
     it("should fail if cancelling with a non-zero preimage", async () => {
@@ -226,7 +224,7 @@ describe("HashlockTransfer", () => {
       state.expiry = "1";
       await expect(
         resolveTransfer(balance, state, { preImage: getRandomBytes32() })
-      ).revertedWith(`Must provide empty hash to cancel payment`);
+      ).revertedWith(`HashlockTransfer: NONZERO_LOCKHASH`);
     });
   });
 });
