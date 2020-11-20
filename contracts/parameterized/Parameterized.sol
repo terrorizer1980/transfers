@@ -2,7 +2,7 @@
 pragma solidity ^0.7.1; 
 pragma experimental "ABIEncoderV2";
 
-import "../interfaces/ITransferDefinition.sol";
+import "../TransferDefinition.sol";
 import "../lib/LibChannelCrypto.sol";
 import "../lib/SafeMath.sol";
 
@@ -15,7 +15,7 @@ import "../lib/SafeMath.sol";
 ///         - expiration: the latest time in which value can transfer
 ///         - UUID: a unique identifier         
 
-contract Parameterized is ITransferDefinition {
+contract Parameterized is TransferDefinition {
   using LibChannelCrypto for bytes32;
   using SafeMath for uint256;
 
@@ -48,20 +48,10 @@ contract Parameterized is ITransferDefinition {
   }
 
   /* solhint-disable */
-  string StateEncoding = "tuple(address receiver, uint256 start, uint256 expiration, bytes32 UUID, tuple(uint256 deltaAmount, uint256 deltaTime) rate)";
-  string ResolverEncoding = "tuple(tuple(bytes32 UUID, uint256 paymentAmountTaken) data, bytes payeeSignature)";
-  string Name = "Parameterized";
+  string public constant override StateEncoding = "tuple(address receiver, uint256 start, uint256 expiration, bytes32 UUID, tuple(uint256 deltaAmount, uint256 deltaTime) rate)";
+  string public constant override ResolverEncoding = "tuple(tuple(bytes32 UUID, uint256 paymentAmountTaken) data, bytes payeeSignature)";
+  string public constant override Name = "Parameterized";
   /* solhint-enable */
-
-  function getRegistryInformation() external override view returns (RegisteredTransfer memory) {
-    RegisteredTransfer memory info = RegisteredTransfer({
-      name: Name,
-      stateEncoding: StateEncoding,
-      resolverEncoding: ResolverEncoding,
-      definition: address(this)
-    });
-    return info;
-  }
 
   /// @notice Creates a parameterized payment from the payer (creator) to the payee (resolver)
   /// @param encodedBalance balance the creator/payer is putting into the transfer
@@ -116,7 +106,7 @@ contract Parameterized is ITransferDefinition {
     require(state.UUID == data.UUID, "UUID did not match!");
 
     // Expiration check
-    require(block.timestamp < state.expiration, "Payment expired!");
+    require(data.paymentAmountTaken == 0 || block.timestamp < state.expiration, "Payment expired!");
 
     // Rate should not be exceeded; multiply by large number to avoid precision errors
     uint256 timeElapsed = block.timestamp.sub(state.start);

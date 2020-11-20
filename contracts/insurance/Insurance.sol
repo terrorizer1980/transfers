@@ -2,7 +2,7 @@
 pragma solidity ^0.7.1; 
 pragma experimental "ABIEncoderV2";
 
-import "../interfaces/ITransferDefinition.sol";
+import "../TransferDefinition.sol";
 import "../lib/SafeMath.sol";
 import "../lib/LibChannelCrypto.sol";
 
@@ -13,7 +13,7 @@ import "../lib/LibChannelCrypto.sol";
 ///         to the guarantor after a specified expiration period, or if
 ///         explicitly cancelled by the receiver.
 
-contract Insurance is ITransferDefinition {
+contract Insurance is TransferDefinition {
   using LibChannelCrypto for bytes32;
   using SafeMath for uint256;
 
@@ -39,20 +39,10 @@ contract Insurance is ITransferDefinition {
   }
 
   /* solhint-disable */
-  string StateEncoding = "tuple(address receiver, address mediator, uint256 collateral, uint256 expiration, bytes32 UUID)";
-  string ResolverEncoding = "tuple(tuple(uint256 amount, bytes32 UUID) data, bytes signature)";
-  string Name = "Insurance";
+  string public constant override StateEncoding = "tuple(address receiver, address mediator, uint256 collateral, uint256 expiration, bytes32 UUID)";
+  string public constant override ResolverEncoding = "tuple(tuple(uint256 amount, bytes32 UUID) data, bytes signature)";
+  string public constant override Name = "Insurance";
   /* solhint-enable */
-
-  function getRegistryInformation() external override view returns (RegisteredTransfer memory) {
-    RegisteredTransfer memory info = RegisteredTransfer({
-      name: Name,
-      stateEncoding: StateEncoding,
-      resolverEncoding: ResolverEncoding,
-      definition: address(this)
-    });
-    return info;
-  }
 
   /// @notice Creates an insurancePayment from the guarantor to the receiver
   /// @param encodedBalance balance the guarantor is putting into the transfer
@@ -98,8 +88,10 @@ contract Insurance is ITransferDefinition {
     // State & resolver UUID should match
     require(state.UUID == data.UUID, "UUID did not match!");
 
-    // Expiration check
-    require(block.timestamp < state.expiration, "Insurance payment expired.");
+    // If expired, no payment can happen.
+    if (block.timestamp >= state.expiration) {
+      return balance;
+    }
 
     // Signature check - receiver signature cancels the insurance payment; mediator signature completes it
     bytes32 hashedData = keccak256(abi.encode(data));
