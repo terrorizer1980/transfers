@@ -5,6 +5,9 @@ import * as packageJson from "./package.json";
 import "hardhat-typechain";
 import "@nomiclabs/hardhat-waffle";
 
+const GANACHE_MNEMONIC =
+  "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
+
 const config: HardhatUserConfig = {
   paths: {
     sources: "./contracts",
@@ -20,15 +23,18 @@ const config: HardhatUserConfig = {
             enabled: true,
             runs: 200,
           },
-        }
-      }
-    ]
+        },
+      },
+    ],
   },
   defaultNetwork: "hardhat",
   networks: {
     ganache: {
       chainId: 1337,
       url: "http://localhost:8545",
+      accounts: {
+        mnemonic: GANACHE_MNEMONIC,
+      },
     },
     hardhat: {
       chainId: 1338,
