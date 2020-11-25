@@ -70,5 +70,5 @@ const transferNames = ["HashlockTransfer", "Withdraw"];
 5. Register the transfer with the deployed `TransferRegistry`:
 
 ```sh
-~/vector > bash ops/register-transfer.sh -t <NAME_OR_ADDRESS_TO_REGISTER>
+~/transfers > npx transfer register --transfer-address 0x... --registry-address 0x...
 ```
