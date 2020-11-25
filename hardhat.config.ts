@@ -10,12 +10,11 @@ import { tidy } from "@connext/vector-types";
 
 task("register", "Registers a transfer")
   .addParam("transferAddress", "The transfer's deployed address")
-  .addParam("transferName", "Name of the transfer contract")
   .addParam("registryAddress", "The registry's deployed address")
   .setAction(async (args, hre) => {
     await hre.ethers.getSigners();
     const transfer = await hre.ethers.getContractAt(
-      args.transferName,
+      "TransferDefinition",
       args.transferAddress
     );
     const transferRegistry = await hre.ethers.getContractAt(
