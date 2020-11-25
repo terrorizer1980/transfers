@@ -13,7 +13,7 @@ const hash = (input: string): string =>
 async function main() {
   const accounts = await ethers.getSigners();
   console.log(
-    `Preparing to deploy transfers from ${
+    `Preparing to register transfers from ${
       accounts[0].address
     } (balance: ${ethers.utils.formatEther(await accounts[0].getBalance())})`
   );

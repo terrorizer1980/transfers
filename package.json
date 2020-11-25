@@ -16,6 +16,7 @@
     "test": "mocha --require ts-node/register --require hardhat/register --timeout 60000 'tests/**/*.spec.ts'"
   },
   "dependencies": {
+    "@connext/vector-contracts": "0.0.16",
     "@connext/vector-types": "0.0.11",
     "@connext/vector-utils": "0.0.11",
     "@openzeppelin/contracts": "3.2.1-solc-0.7",
