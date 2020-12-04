@@ -1,40 +1,12 @@
-import { task } from "hardhat/config";
 import { HardhatUserConfig } from "hardhat/types";
-import { TransferRegistry } from "@connext/vector-contracts";
-
-import * as packageJson from "./package.json";
-
+import { config as dotEnvConfig } from "dotenv";
 import "hardhat-typechain";
 import "@nomiclabs/hardhat-waffle";
-import { tidy } from "@connext/vector-types";
 
-task("register", "Registers a transfer")
-  .addParam("transferAddress", "The transfer's deployed address")
-  .addParam("registryAddress", "The registry's deployed address")
-  .setAction(async (args, hre) => {
-    await hre.ethers.getSigners();
-    const transfer = await hre.ethers.getContractAt(
-      "TransferDefinition",
-      args.transferAddress
-    );
-    const transferRegistry = await hre.ethers.getContractAt(
-      TransferRegistry.abi,
-      args.registryAddress
-    );
-    const info = await transfer.getRegistryInformation();
-    const cleaned = {
-      name: info.name,
-      definition: info.definition,
-      resolverEncoding: tidy(info.resolverEncoding),
-      stateEncoding: tidy(info.stateEncoding),
-    };
-    console.log(
-      `Adding transfer to registry ${JSON.stringify(cleaned, null, 2)}`
-    );
-    const tx = await transferRegistry.addTransferDefinition(cleaned);
-    const txSent = await tx.wait();
-    console.log(`Confirmed addTransferDefinition: ${txSent.transactionHash}`);
-  });
+dotEnvConfig();
+
+import * as packageJson from "./package.json";
+import "./tasks";
 
 const GANACHE_MNEMONIC =
   "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
@@ -70,6 +42,20 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 1338,
       loggingEnabled: false,
+    },
+    rinkeby: {
+      url: process.env.ETH_PROVIDER,
+      chainId: 4,
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      },
+    },
+    kovan: {
+      url: process.env.ETH_PROVIDER,
+      chainId: 42,
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      },
     },
   },
   typechain: {
