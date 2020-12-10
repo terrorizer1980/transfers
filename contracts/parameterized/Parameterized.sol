@@ -100,7 +100,7 @@ contract Parameterized is TransferDefinition {
     bytes32 hashedData = keccak256(abi.encode(data));
 
     // solhint-disable-next-line
-    require(state.receiver == LibChannelCrypto.recoverChannelMessageSigner(hashedData, resolver.payeeSignature), "Receiver signature did not match.");
+    require(state.receiver == LibChannelCrypto.recoverUtilityMessageSigner(hashedData, resolver.payeeSignature), "Receiver signature did not match.");
 
     // State & resolver UUID should match
     require(state.UUID == data.UUID, "UUID did not match!");

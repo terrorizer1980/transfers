@@ -95,7 +95,7 @@ contract Insurance is TransferDefinition {
 
     // Signature check - receiver signature cancels the insurance payment; mediator signature completes it
     bytes32 hashedData = keccak256(abi.encode(data));
-    address signer = LibChannelCrypto.recoverChannelMessageSigner(hashedData, resolver.signature);
+    address signer = LibChannelCrypto.recoverUtilityMessageSigner(hashedData, resolver.signature);
     
     if (signer == state.receiver) return balance;
 

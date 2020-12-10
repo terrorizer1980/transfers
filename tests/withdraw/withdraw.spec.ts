@@ -32,10 +32,11 @@ describe("Withdraw", () => {
   let WithdrawResolverEncoding: string;
 
   beforeEach(async () => {
+    const signers = await ethers.getSigners();
     alice = new ChannelSigner(Wallet.createRandom().privateKey);
     bob = new ChannelSigner(Wallet.createRandom().privateKey);
 
-    const factory = await ethers.getContractFactory("Withdraw", alice);
+    const factory = await ethers.getContractFactory("Withdraw", signers[0]);
     const deployed = await factory.deploy();
     withdraw = (await deployed.deployed()) as Withdraw;
 
