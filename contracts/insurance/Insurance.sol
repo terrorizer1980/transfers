@@ -44,6 +44,12 @@ contract Insurance is TransferDefinition {
   string public constant override Name = "Insurance";
   /* solhint-enable */
 
+  // TODO: properly implement
+  function EncodedCancel() external pure override returns(bytes memory) {
+    TransferResolver memory resolver;
+    return abi.encode(resolver);
+  }
+
   /// @notice Creates an insurancePayment from the guarantor to the receiver
   /// @param encodedBalance balance the guarantor is putting into the transfer
   /// @param encodedState encoded transfer parameters (insurance payment info)

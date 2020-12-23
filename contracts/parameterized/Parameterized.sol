@@ -53,6 +53,12 @@ contract Parameterized is TransferDefinition {
   string public constant override Name = "Parameterized";
   /* solhint-enable */
 
+  // TODO: properly implement
+  function EncodedCancel() external pure override returns(bytes memory) {
+    TransferResolver memory resolver;
+    return abi.encode(resolver);
+  }
+
   /// @notice Creates a parameterized payment from the payer (creator) to the payee (resolver)
   /// @param encodedBalance balance the creator/payer is putting into the transfer
   /// @param encodedState encoded transfer parameters
