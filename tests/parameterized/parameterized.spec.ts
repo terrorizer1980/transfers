@@ -15,6 +15,7 @@ import {
   getRandomBytes32,
   mkBytes32,
   recoverAddressFroUtilityMessage,
+  mkSig
 } from "@connext/vector-utils";
 import { Wallet } from "ethers";
 import { defaultAbiCoder, keccak256, recoverAddress } from "ethers/lib/utils";
@@ -195,17 +196,17 @@ describe("Parameterized", () => {
     expect(registry.definition).to.be.eq(parameterized.address);
 
     let parameterizedResolverData: ParameterizedResolverData = {
-      UUID: '',
+      UUID: mkBytes32('0x0'),
       paymentAmountTaken: '0'
     }
 
     let parameterizedResolver: ParameterizedResolver = {
       data: parameterizedResolverData,
-      payeeSignature: ''
+      payeeSignature: mkSig('0x0')
     }
 
     expect(registry.encodedCancel).to.be.eq(
-      encodeTransferResolver({ parameterizedResolver }, registry.resolverEncoding)
+      encodeTransferResolver(parameterizedResolver, registry.resolverEncoding)
     );
   });
 

@@ -48,7 +48,7 @@ contract Insurance is TransferDefinition {
   // @dev simply encodes '0' for the amount in ResolverData
   function EncodedCancel() external pure override returns(bytes memory) {
     ResolverData memory data = ResolverData(0, 0);
-    TransferResolver memory resolver = TransferResolver(data, '');
+    TransferResolver memory resolver = TransferResolver(data, new bytes(65));
 
     return abi.encode(resolver);
   }

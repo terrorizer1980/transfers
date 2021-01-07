@@ -56,8 +56,8 @@ contract Parameterized is TransferDefinition {
   // @notice returns the encoded cancellation resolver
   // @dev internally, just sets paymentAmountTaken to 0
   function EncodedCancel() external pure override returns(bytes memory) {
-    ResolverData memory data = ResolverData('', 0);
-    TransferResolver memory resolver = TransferResolver(data, '');
+    ResolverData memory data = ResolverData(0, 0);
+    TransferResolver memory resolver = TransferResolver(data, new bytes(65));
 
     return abi.encode(resolver);
   }
