@@ -187,6 +187,20 @@ describe("Insurance", () => {
       "tuple(tuple(uint256 amount, bytes32 UUID) data, bytes signature)"
     );
     expect(registry.definition).to.be.eq(insurance.address);
+
+    let insuranceResolverData: InsuranceResolverData = {
+      amount: '0',
+      UUID: ''
+    }
+
+    let insuranceResolver: InsuranceResolver = {
+      data: insuranceResolverData,
+      signature: ''
+    }
+
+    expect(registry.encodedCancel).to.be.eq(
+      encodeTransferResolver({ insuranceResolver }, registry.resolverEncoding)
+    );
   });
 
   /** create tests **/

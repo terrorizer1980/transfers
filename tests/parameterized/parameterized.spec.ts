@@ -193,6 +193,20 @@ describe("Parameterized", () => {
       "tuple(tuple(bytes32 UUID, uint256 paymentAmountTaken) data, bytes payeeSignature)"
     );
     expect(registry.definition).to.be.eq(parameterized.address);
+
+    let parameterizedResolverData: ParameterizedResolverData = {
+      UUID: '',
+      paymentAmountTaken: '0'
+    }
+
+    let parameterizedResolver: ParameterizedResolver = {
+      data: parameterizedResolverData,
+      payeeSignature: ''
+    }
+
+    expect(registry.encodedCancel).to.be.eq(
+      encodeTransferResolver({ parameterizedResolver }, registry.resolverEncoding)
+    );
   });
 
   /** create tests */
@@ -406,6 +420,59 @@ describe("Parameterized", () => {
   /** resolve tests */
 
   describe("Resolve", () => {
+    it("should resolve successfully when cancelled by the recipient", async () => {
+      let UUID = getRandomBytes32();
+
+      // Alice puts up 10k, bob puts up zero
+      let initialBalance: Balance = {
+        amount: ["10000", "0"],
+        to: [alice.address, bob.address],
+      };
+
+      // Essentially an infinite rate since it's larger than the balance @ 1 second
+      let rate: Rate = {
+        deltaAmount: "100000",
+        deltaTime: "1",
+      };
+
+      // Start: now
+      // Expiration: 5 days in the future
+      let initialState: ParameterizedState = {
+        receiver: bob.address,
+        start: `${Math.floor(Date.now() / 1000)}`,
+        expiration: `${Math.floor(Date.now() / 1000) + 5 * 24 * 60 * 60}`,
+        UUID: UUID,
+        rate: rate,
+      };
+
+      const { balance, state } = await createInitialState(
+        initialState,
+        initialBalance
+      );
+
+      let resolverDataEncoding = [
+        "tuple(bytes32 UUID, uint256 paymentAmountTaken)",
+      ];
+      let resolverData: ParameterizedResolverData = {
+        UUID: UUID,
+        paymentAmountTaken: "0",
+      };
+      let encodedData = defaultAbiCoder.encode(resolverDataEncoding, [
+        resolverData,
+      ]);
+      let hashedData = keccak256(encodedData);
+
+      const recipientSignature = await bob.signUtilityMessage(hashedData);
+
+      let resolver: ParameterizedResolver = {
+        data: resolverData,
+        payeeSignature: recipientSignature,
+      };
+
+      const result = await resolveTransfer(balance, state, resolver);
+      await validateResult(initialBalance, initialState, resolver, result);
+    });
+
     it("should resolve successfully when taking full payment", async () => {
       let UUID = getRandomBytes32();
 
