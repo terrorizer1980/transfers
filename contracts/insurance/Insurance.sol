@@ -44,6 +44,15 @@ contract Insurance is TransferDefinition {
   string public constant override Name = "Insurance";
   /* solhint-enable */
 
+  // @notice returns the encoded cancellation resolver
+  // @dev simply encodes '0' for the amount in ResolverData
+  function EncodedCancel() external pure override returns(bytes memory) {
+    ResolverData memory data = ResolverData(0, 0);
+    TransferResolver memory resolver = TransferResolver(data, new bytes(65));
+
+    return abi.encode(resolver);
+  }
+
   /// @notice Creates an insurancePayment from the guarantor to the receiver
   /// @param encodedBalance balance the guarantor is putting into the transfer
   /// @param encodedState encoded transfer parameters (insurance payment info)
@@ -85,18 +94,25 @@ contract Insurance is TransferDefinition {
     TransferResolver memory resolver = abi.decode(encodedResolver, (TransferResolver));
     ResolverData memory data = resolver.data;
 
-    // State & resolver UUID should match
-    require(state.UUID == data.UUID, "UUID did not match!");
+    // If payment amount is zero, cancel.
+    if (data.amount == 0) {
+      return balance;
+    }
 
     // If expired, no payment can happen.
     if (block.timestamp >= state.expiration) {
       return balance;
     }
 
+    // State & resolver UUID should match
+    require(state.UUID == data.UUID, "UUID did not match!");
+
     // Signature check - receiver signature cancels the insurance payment; mediator signature completes it
     bytes32 hashedData = keccak256(abi.encode(data));
     address signer = LibChannelCrypto.recoverUtilityMessageSigner(hashedData, resolver.signature);
     
+    // Cancel payment if signer is the receiver.
+    // Only complete payment if signer is the mediator.
     if (signer == state.receiver) return balance;
 
     require(signer == state.mediator, "Signature did not verify!");

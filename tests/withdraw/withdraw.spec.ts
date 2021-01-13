@@ -145,6 +145,12 @@ describe("Withdraw", () => {
       "tuple(bytes responderSignature)"
     );
     expect(registry.definition).to.be.eq(withdraw.address);
+    expect(registry.encodedCancel).to.be.eq(
+      encodeTransferResolver(
+        { responderSignature: mkSig("0x0") },
+        registry.resolverEncoding
+      )
+    );
   });
 
   describe("Create", () => {
@@ -248,7 +254,7 @@ describe("Withdraw", () => {
       const responderSignature = await bob.signMessage(getRandomBytes32());
       await expect(
         resolveTransfer(balance, state, { responderSignature })
-      ).revertedWith("Withdraw.resolve: INVALID_RESPONDER_SIG");
+      ).revertedWith("Withdraw: INVALID_RESPONDER_SIG");
     });
 
     it("should cancel if the responder gives empty signature", async () => {

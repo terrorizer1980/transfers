@@ -128,6 +128,9 @@ describe("HashlockTransfer", () => {
     );
     expect(registry.resolverEncoding).to.be.eq("tuple(bytes32 preImage)");
     expect(registry.definition).to.be.eq(transfer.address);
+    expect(registry.encodedCancel).to.be.eq(
+      encodeTransferResolver({ preImage: HashZero }, registry.resolverEncoding)
+    );
   });
 
   describe("Create", () => {
@@ -136,6 +139,15 @@ describe("HashlockTransfer", () => {
       const { state, balance } = await createInitialState(preImage);
       const res = await createTransfer(balance, state);
       expect(res).to.be.true;
+    });
+
+    it("should fail create if sender balance is zero", async () => {
+      const preImage = getRandomBytes32();
+      const { state, balance } = await createInitialState(preImage);
+      balance.amount[0] = "0";
+      await expect(createTransfer(balance, state)).revertedWith(
+        "HashlockTransfer: ZER0_SENDER_BALANCE"
+      );
     });
 
     it("should fail create if receiver balance is nonzero", async () => {
@@ -159,7 +171,7 @@ describe("HashlockTransfer", () => {
     it("should fail create if expiry is nonzero and expired", async () => {
       const preImage = getRandomBytes32();
       const { state, balance } = await createInitialState(preImage);
-      state.expiry = "1";
+      state.expiry = Math.floor((Date.now() - 1000000) / 1000).toString();
       await expect(createTransfer(balance, state)).revertedWith(
         "HashlockTransfer: EXPIRED_TIMELOCK"
       );
@@ -168,7 +180,7 @@ describe("HashlockTransfer", () => {
     it("should create successfully if expiry is nonzero and not expired", async () => {
       const preImage = getRandomBytes32();
       const { state, balance } = await createInitialState(preImage);
-      state.expiry = ((await provider.getBlockNumber()) + 1).toString();
+      state.expiry = (Date.now() + 30).toString();
       const res = await createTransfer(balance, state);
       expect(res).to.be.true;
     });
@@ -185,7 +197,7 @@ describe("HashlockTransfer", () => {
     it("should resolve successfully with nonzero expiry that is not expired", async () => {
       const preImage = getRandomBytes32();
       const { state, balance } = await createInitialState(preImage);
-      state.expiry = ((await provider.getBlockNumber()) + 1).toString();
+      state.expiry = (Date.now() + 30).toString();
       const result = await resolveTransfer(balance, state, { preImage });
       await validateResult(balance, state, { preImage }, result);
     });
@@ -218,13 +230,13 @@ describe("HashlockTransfer", () => {
       ).revertedWith("HashlockTransfer: INVALID_PREIMAGE");
     });
 
-    it("should fail if cancelling with a non-zero preimage", async () => {
+    it("should fail if the payment is expired and trying to resolve", async () => {
       const preImage = getRandomBytes32();
       const { state, balance } = await createInitialState(preImage);
       state.expiry = "1";
-      await expect(
-        resolveTransfer(balance, state, { preImage: getRandomBytes32() })
-      ).revertedWith(`HashlockTransfer: NONZERO_LOCKHASH`);
+      await expect(resolveTransfer(balance, state, { preImage })).revertedWith(
+        "HashlockTransfer: PAYMENT_EXPIRED"
+      );
     });
   });
 });

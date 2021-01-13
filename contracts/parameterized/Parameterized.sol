@@ -53,6 +53,15 @@ contract Parameterized is TransferDefinition {
   string public constant override Name = "Parameterized";
   /* solhint-enable */
 
+  // @notice returns the encoded cancellation resolver
+  // @dev internally, just sets paymentAmountTaken to 0
+  function EncodedCancel() external pure override returns(bytes memory) {
+    ResolverData memory data = ResolverData(0, 0);
+    TransferResolver memory resolver = TransferResolver(data, new bytes(65));
+
+    return abi.encode(resolver);
+  }
+
   /// @notice Creates a parameterized payment from the payer (creator) to the payee (resolver)
   /// @param encodedBalance balance the creator/payer is putting into the transfer
   /// @param encodedState encoded transfer parameters
@@ -96,6 +105,11 @@ contract Parameterized is TransferDefinition {
     TransferResolver memory resolver = abi.decode(encodedResolver, (TransferResolver));
     ResolverData memory data = resolver.data;
 
+    // Cancellation case: paymentAmountTaken == 0
+    if (data.paymentAmountTaken == 0) {
+      return balance;
+    }
+
     // Signature check
     bytes32 hashedData = keccak256(abi.encode(data));
 
@@ -106,7 +120,7 @@ contract Parameterized is TransferDefinition {
     require(state.UUID == data.UUID, "UUID did not match!");
 
     // Expiration check
-    require(data.paymentAmountTaken == 0 || block.timestamp < state.expiration, "Payment expired!");
+    require(block.timestamp < state.expiration, "Payment expired!");
 
     // Rate should not be exceeded; multiply by large number to avoid precision errors
     uint256 timeElapsed = block.timestamp.sub(state.start);

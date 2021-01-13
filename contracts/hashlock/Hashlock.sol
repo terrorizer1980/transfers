@@ -4,7 +4,8 @@ pragma experimental ABIEncoderV2;
 
 import "../TransferDefinition.sol";
 
-/// @title Hashlock Transfer
+/// @title HashlockTransfer
+/// @author Connext <support@connext.network>
 /// @notice This contract allows users to claim a payment locked in
 ///         the application if they provide the correct preImage. The payment is
 ///         reverted if not unlocked by the timelock if one is provided.
@@ -19,22 +20,33 @@ contract HashlockTransfer is TransferDefinition {
         bytes32 preImage;
     }
 
+    // Provide registry information
     string public constant override Name = "HashlockTransfer";
-    string
-        public constant
-        override StateEncoding = "tuple(bytes32 lockHash, uint256 expiry)";
-    string
-        public constant
-        override ResolverEncoding = "tuple(bytes32 preImage)";
+    string public constant override StateEncoding =
+        "tuple(bytes32 lockHash, uint256 expiry)";
+    string public constant override ResolverEncoding =
+        "tuple(bytes32 preImage)";
+
+    function EncodedCancel() external pure override returns(bytes memory) {
+      TransferResolver memory resolver;
+      resolver.preImage = bytes32(0);
+      return abi.encode(resolver);
+    } 
 
     function create(bytes calldata encodedBalance, bytes calldata encodedState)
         external
-        override
         view
+        override
         returns (bool)
     {
+        // Decode parameters
         TransferState memory state = abi.decode(encodedState, (TransferState));
         Balance memory balance = abi.decode(encodedBalance, (Balance));
+
+        require(
+            balance.amount[0] > 0,
+            "HashlockTransfer: ZER0_SENDER_BALANCE"
+        );
 
         require(
             balance.amount[1] == 0,
@@ -45,9 +57,11 @@ contract HashlockTransfer is TransferDefinition {
             "HashlockTransfer: EMPTY_LOCKHASH"
         );
         require(
-            state.expiry == 0 || state.expiry > block.number,
+            state.expiry == 0 || state.expiry > block.timestamp,
             "HashlockTransfer: EXPIRED_TIMELOCK"
         );
+
+        // Valid transfer state
         return true;
     }
 
@@ -55,20 +69,19 @@ contract HashlockTransfer is TransferDefinition {
         bytes calldata encodedBalance,
         bytes calldata encodedState,
         bytes calldata encodedResolver
-    ) external override view returns (Balance memory) {
+    ) external view override returns (Balance memory) {
         TransferState memory state = abi.decode(encodedState, (TransferState));
-        TransferResolver memory resolver = abi.decode(
-            encodedResolver,
-            (TransferResolver)
-        );
+        TransferResolver memory resolver =
+            abi.decode(encodedResolver, (TransferResolver));
         Balance memory balance = abi.decode(encodedBalance, (Balance));
 
         // If you pass in bytes32(0), payment is canceled
-        // If timelock is nonzero and has expired, payment is canceled
-        if (
-            resolver.preImage != bytes32(0) &&
-            (state.expiry == 0 || state.expiry > block.number)
-        ) {
+        // If timelock is nonzero and has expired, payment must be canceled
+        // otherwise resolve will revert
+        if (resolver.preImage != bytes32(0)) {
+            // Payment must not be expired
+            require(state.expiry == 0 || state.expiry > block.timestamp, "HashlockTransfer: PAYMENT_EXPIRED");
+
             // Check hash for normal payment unlock
             bytes32 generatedHash = sha256(abi.encode(resolver.preImage));
             require(
@@ -79,14 +92,10 @@ contract HashlockTransfer is TransferDefinition {
             // Update state
             balance.amount[1] = balance.amount[0];
             balance.amount[0] = 0;
-        } else {
-            // To cancel, the preImage must be empty (not simply incorrect)
-            require(
-                resolver.preImage == bytes32(0),
-                "HashlockTransfer: NONZERO_LOCKHASH"
-            );
-            // There are no additional state mutations
         }
+        // To cancel, the preImage must be empty (not simply incorrect)
+        // There are no additional state mutations, and the preImage is
+        // asserted by the `if` statement
 
         return balance;
     }

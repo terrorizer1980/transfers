@@ -15,6 +15,7 @@ import {
   getRandomBytes32,
   mkBytes32,
   recoverAddressFroUtilityMessage,
+  mkSig
 } from "@connext/vector-utils";
 import { Wallet } from "ethers";
 import { defaultAbiCoder, keccak256 } from "ethers/lib/utils";
@@ -187,6 +188,20 @@ describe("Insurance", () => {
       "tuple(tuple(uint256 amount, bytes32 UUID) data, bytes signature)"
     );
     expect(registry.definition).to.be.eq(insurance.address);
+
+    let insuranceResolverData: InsuranceResolverData = {
+      amount: '0',
+      UUID: mkBytes32('0x0')
+    }
+
+    let insuranceResolver: InsuranceResolver = {
+      data: insuranceResolverData,
+      signature: mkSig('0x0')
+    }
+
+    expect(registry.encodedCancel).to.be.eq(
+      encodeTransferResolver(insuranceResolver, registry.resolverEncoding)
+    );
   });
 
   /** create tests **/

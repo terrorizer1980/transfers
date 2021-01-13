@@ -47,14 +47,14 @@ const config: HardhatUserConfig = {
       url: process.env.ETH_PROVIDER,
       chainId: 4,
       accounts: {
-        mnemonic: process.env.MNEMONIC,
+        mnemonic: process.env.MNEMONIC ?? GANACHE_MNEMONIC,
       },
     },
     kovan: {
       url: process.env.ETH_PROVIDER,
       chainId: 42,
       accounts: {
-        mnemonic: process.env.MNEMONIC,
+        mnemonic: process.env.MNEMONIC ?? GANACHE_MNEMONIC,
       },
     },
   },
