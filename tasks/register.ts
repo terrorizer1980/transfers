@@ -21,6 +21,7 @@ export default task("register", "Registers a transfer")
       definition: info.definition,
       resolverEncoding: tidy(info.resolverEncoding),
       stateEncoding: tidy(info.stateEncoding),
+      encodedCancel: info.encodedCancel ?? "0x",
     };
     console.log(
       `Adding transfer to registry ${JSON.stringify(cleaned, null, 2)}`
