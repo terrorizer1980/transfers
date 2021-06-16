@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import {
   Balance,
-  CrosschainTransferState,
-  CrosschainTransferResolver,
+  // CrosschainTransferState,
+  // CrosschainTransferResolver,
 } from "@connext/vector-types";
 import {
   getRandomAddress,
@@ -20,9 +20,13 @@ import { Wallet } from "ethers";
 import { ethers } from "hardhat";
 import { CrosschainTransfer } from "../../typechain";
 
+// TODO:
+type CrosschainTransferState = any;
+type CrosschainTransferResolver = any;
+
 const { utils, BigNumber } = ethers;
 
-describe("CrosschainTransfer", () => {
+describe.only("CrosschainTransfer", () => {
   const provider = ethers.provider;
 
   let initiator: ChannelSigner;
@@ -167,17 +171,7 @@ describe("CrosschainTransfer", () => {
     const registry = await transfer.getRegistryInformation();
     expect(registry.name).to.be.eq("CrosschainTransfer");
     expect(registry.stateEncoding).to.be.eq(
-      `tuple(
-        bytes initiatorSignature,
-        address initiator,
-        address responder,
-        bytes32 data,
-        uint256 nonce,
-        uint256 fee,
-        address callTo,
-        bytes callData,
-        bytes32 lockHash
-      )`
+      `tuple(bytes initiatorSignature, address initiator, address responder, bytes32 data, uint256 nonce, uint256 fee, address callTo, bytes callData, bytes32 lockHash)`
     );
     expect(registry.resolverEncoding).to.be.eq(
       "tuple(bytes responderSignature, bytes32 preImage)"
