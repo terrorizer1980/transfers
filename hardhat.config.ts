@@ -1,6 +1,6 @@
 import { HardhatUserConfig } from "hardhat/types";
 import { config as dotEnvConfig } from "dotenv";
-import "hardhat-typechain";
+import "@typechain/hardhat";
 import "@nomiclabs/hardhat-waffle";
 
 dotEnvConfig();
@@ -20,7 +20,7 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: packageJson.devDependencies.solc,
+        version: "0.7.1",
         settings: {
           optimizer: {
             enabled: true,
@@ -57,9 +57,6 @@ const config: HardhatUserConfig = {
         mnemonic: process.env.MNEMONIC ?? GANACHE_MNEMONIC,
       },
     },
-  },
-  typechain: {
-    target: "ethers-v5",
   },
 };
 
